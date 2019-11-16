@@ -1,0 +1,198 @@
+<?php
+/**
+ * Name:  iplog_module     V2.0  11/15/19
+ */
+
+define('IPLOG_VARIABLE','iplog_subnets');
+
+function iplog_menu() {
+  $items = array();
+  $items['admin/config/people/ip-ranges'] = array(
+    'title' => 'IP range bans',
+    'description' => 'Manage banned IP addresse ranges.',
+    'page callback' => 'iplog_page',
+    'access arguments' => array('ban IP address ranges'),
+    'file' => 'iplog.admin.inc',
+    'weight' => 10,
+  );
+  $items['admin/config/people/ip-ranges/delete/%'] = array(
+    'title' => 'Delete IP range',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('iplog_delete', 5),
+    'access arguments' => array('ban IP address ranges'),
+    'file' => 'iplog.admin.inc',
+  $items['admin/config/people/ip-ranges/whitelist_own'] = array(
+    'page callback' => 'iplog_whitelist_own_address',
+    'access arguments' => array('ban IP address ranges'),
+    ), 
+  );
+  $items ['iplog404'] = array (
+    'title' => 'Page not found',
+    'description' => 'Track IP address of suspicious probes.',
+    'access callback' => TRUE,
+    'page callback' => 'iplog_404_tracker',
+    'file' => 'iplog_404_tracker.php',
+    'type' => MENU_CALLBACK,
+  );
+  $items ['iplogsubnets'] = array (
+    'title' => 'IP subnet definitions',
+    'description' => 'Identify the subnet owner.',
+    'access callback' => TRUE,
+    'page callback' => 'iplog_subnets',
+    'file' => 'iplog_subnets.php',
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+};
+
+function iplog_sanitize_string($string) {
+  return trim(strip_tags(htmlentities(stripslashes($string),ENT_QUOTES))); 
+}
+
+function iplog_debug_msg($msg,$structure) {
+  drupal_set_message("DEBUG ".$msg ,'status');
+  if (!empty($structure)) {
+    drupal_set_message('<pre>'.print_r($structure, true).'</pre>','status');
+  }
+}
+
+
+/**
+ * Implements hook_permission().
+ */
+function iplog_permission() {
+  return array(
+    'ban IP address ranges' => array(
+      'title' => t('Ban IP address ranges'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_boot().
+ *
+ * Checks users ip first against the whitelist, then the blacklist if needed.
+ *
+ * @see iplog_get_ip_list()
+ * @see iplog_check_ip()
+ * @see iplog_deny_access()
+ */
+function iplog_boot() {
+  $whitelist = iplog_get_ip_list('whitelist');
+  $current_ip = ip_address();
+  foreach ($whitelist as $ip) {
+    if (iplog_check_ip($ip->ip, $current_ip)) {
+      $whitelisted = 1;
+      break;
+    }
+  }
+
+  if (!isset($whitelisted)) {
+    $blacklist = iplog_get_ip_list('blacklist');
+    foreach ($blacklist as $ip) {
+      if (iplog_check_ip($ip->ip, $current_ip)) {
+        iplog_deny_access();
+      }
+    }
+  }
+}
+
+
+/**
+ * Handles denied users.
+ *
+ * Prints a message and exits if access is denied.
+ */
+function iplog_deny_access() {
+  header($_SERVER['SERVER_PROTOCOL'] . ' 403 Forbidden');
+  print 'Sorry, ' . check_plain(ip_address()) . ' has been banned.';
+  exit();
+}
+
+/**
+ * Checks users ip first against the whitelist, then the blacklist if needed.
+ *
+ * @param $ip
+ *   Black- or whitelisted ip-address.
+ * @param $current_ip
+ *   Ip to be checked against the list, usually users current ip-address.
+ *
+ * @return
+ *   TRUE if the ip is on the list, FALSE if it is not.
+ *
+ * @see iplog_check_range()
+ */
+function iplog_check_ip($ip, $current_ip) {
+  $type = strpos($ip, '-') ? 'range' : 'single';
+  return ($type == 'single') ? $ip == $current_ip : iplog_check_range($ip, $current_ip);
+}
+
+/**
+ * Checks if the given ip-address matches the given range.
+ *
+ * @param $ip
+ *   Black- or whitelisted ip-address range.
+ * @param $current_ip
+ *   Ip to be checked against the list, usually users current ip-address.
+ *
+ * @return
+ *   TRUE if the ip is on the list, FALSE if it is not.
+ */
+function iplog_check_range($ip, $current_ip) {
+  $ip = explode('-', $ip);
+  list($lower, $upper) = $ip;
+  $lower_dec = (float) sprintf("%u", ip2long($lower));
+  $upper_dec = (float) sprintf("%u", ip2long($upper));
+  $ip_dec = (float) sprintf("%u", ip2long($current_ip));
+  return (($ip_dec >= $lower_dec) && ($ip_dec <= $upper_dec));
+}
+
+/**
+ * Creates/updates an entry to the ban database.
+ *
+ * @param $ip
+ *   IP-address or range to bw written to the database.
+ * @param $type
+ *   Type of the list(blacklist, whitelist).
+ * @param $bid
+ *   (optional) id of the current ban, used when existing record is updated.
+ */
+function iplog_write_record($ip, $type, $bid = NULL) {
+  db_merge('ip_ranges')
+    ->key(array('bid' => $bid))
+    ->fields(array(
+      'bid' => $bid,
+      'ip' => $ip,
+      'type' => $type,
+    ))
+    ->execute();
+}
+
+/**
+ * Retrieves list of banned ip from the database.
+ *
+ * @param $type
+ *   (optional) Retrieve only the ip's of given list type(blacklist, whitelist).
+ *
+ * @return
+ *   An array of black-/whitelisted IP-addresses.
+ */
+
+function iplog_get_ip_list($type = '') {
+  $query = db_select('ip_ranges', 'list');
+  if ($type) {
+    $query->condition('list.type', $type, '=')
+      ->fields('list', array('ip'));
+  }
+  else {
+    $query->fields('list');
+  }
+  return $query->execute()->fetchAll();
+}
+
+function iplog_whitelist_own_address(){
+  iplog_write_record(ip_address(), 'whitelist');
+  drupal_set_message('Your own IP-address ('.ip_address().') has been whitelisted.');
+  drupal_goto('admin/config/people/ip-ranges');
+}
+

@@ -1,0 +1,91 @@
+<?php
+/*
+ * Name: iplog.install  V2.0 11/15/19
+ */
+
+function iplog_install() {
+  //$ipLogObj = new IpLog();
+  //$ipLogObj->setup();
+}
+
+function iplog_uninstall() {
+  if(!empty(variable_get(IPLOG_VARIABLE,array()))) {
+      variable_del(IPLOG_VARIABLE);
+    }
+}
+
+/**
+ * Implements hook_schema().
+ */
+function iplog_schema() {
+  $schema['ip_ranges'] = array(
+    'fields' => array(
+      'bid' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'ip' => array(
+        'type' => 'varchar',
+        'length' => 31,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'type' => array(
+        'type' => 'varchar',
+        'length' => 9,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array('bid'),
+    'indexes' => array(
+      'bid' => array('bid'),
+      'type' => array('type'),
+    ),
+  );
+  
+  $schema['ip_log'] = array(
+    'description' => 'record of IP addresses that attempt unauthorized access.',
+    'fields' => array(
+      'IPkey' => array( 
+        'type'=>'int',
+        'unsigned'=>TRUE,
+        'size'=>'big',
+        'not null' => TRUE,
+        'description'=>'IP Address as integer.',
+      ),
+      'IPaddr' => array( 
+        'type'=>'char', 
+        'length'=>16,
+      ),
+      'Hits' => array( 
+        'type' => 'int', 
+        'size'=>'normal',
+      ),
+      'OrgID' => array( 
+        'type'=>'varchar', 
+        'length'=>16,
+      ),
+    ),
+    'primary key' => array( 'IPkey', ),
+  );
+  
+  $schema['ip_known'] = array(
+    'description' => 'IP Address ranges known and identified as safe.',
+    'fields' => array(
+      'CIDR' => array( 
+        'type'=>'varchar',
+        'length'=>16,
+        'description'=>'Field fieldname of tablename.',
+      ),
+      'OrgID' => array( 
+        'type'=>'varchar', 
+        'length'=>16,
+      ),
+    ),
+    'primary key' => array( 'CIDR', ),
+  );
+
+  return $schema;
+}
