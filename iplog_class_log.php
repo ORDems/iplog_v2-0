@@ -29,25 +29,27 @@ class IpLog{
       )
   );
   
-  public function iplog() {
+  private function ipLog($org) {
     $user = $GLOBALS['user'];  
     //global $items;
     //nlp_debug_msg('items', $_SERVER);
     $ip = $user->hostname;
-    $organization = 'unknown';
+    $organization = $org;
     $ipSubNets = $this->getIpAddrs();
     //nlp_debug_msg('subnets', $ipSubNets);
     if(!empty($ipSubNets)) {
-      foreach ($ipSubNets as $ipSubNet => $orgId) {
+      foreach ($ipSubNets as $ipSubNet => $record) {
         $subNetBase = $this->cidr_match($ip, $ipSubNet);
         if(!empty($subNetBase)) {
-          $organization = $orgId;
+          $organization = $record['orgId'];
+          $cidr = $ipSubNet;
           break;
         }
       }
     }
     if(empty($subNetBase)) {
       $subNetBase = $ip;
+      $cidr = $ip;
     }
     $ipInt = ip2long($subNetBase);
     //db_set_active(NLP_DATABASE);
@@ -57,7 +59,8 @@ class IpLog{
           'IPkey' => $ipInt,
           ))
         ->fields(array(
-          'IPaddr' => $ip,
+          //'IPkey' => $ipInt,
+          'IPaddr' => $cidr,
           'Hits' => 1,
           'OrgID' => $organization,
         ))
@@ -72,6 +75,15 @@ class IpLog{
     }
     //db_set_active('default');
   }
+  
+  public function ipLogError() {
+    $this->ipLog('unknown');
+  }
+  
+  public function ipLogUser() {
+    $this->ipLog('user');
+  }
+  
   
   public function getIpLog() {
     $query = db_select(self::IPLOGTBL, 'g')
@@ -91,6 +103,12 @@ class IpLog{
     return $logs;
   }
   
+  public function deleteIpLogEntry($ipKey) {
+    db_delete(self::IPLOGTBL)
+      ->condition('IPkey', $ipKey)
+      ->execute();
+  }
+  
   public function getIpAddrs() {
     $query = db_select(self::KNOWNIPTBL, 'k')
       ->fields('k');
@@ -101,16 +119,18 @@ class IpLog{
       //iplog_debug_msg('record', $record);
       if(empty($record)) {break;}
       $cidr = $record['CIDR'];
-      $knownIps[$cidr] = $record['OrgID'];
+      $knownIps[$cidr]['orgId'] = $record['OrgID'];
+      $knownIps[$cidr]['type'] = $record['Type'];
     } while (TRUE);   
     return $knownIps;
   }
   
-  public function setIpAddr($range,$name) {
+  public function setIpAddr($range,$name,$type) {
     db_merge(self::KNOWNIPTBL)
       ->key(array('CIDR'=> $range))
       ->fields(array(
         'OrgID' => $name,
+        'Type' => $type,
       ))
       ->execute();
   }

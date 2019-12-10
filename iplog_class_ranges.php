@@ -14,9 +14,14 @@ class IpRanges{
   const IPRANGESTBL = "ip_ranges";
  
 
-  public function setIpRange($range,$type) {
+  public function setIpRange($range,$type,$source,$netName) {
     db_insert(self::IPRANGESTBL)
-      ->fields(array('ip' => $range, 'type' => $type))
+      ->fields(array(
+        'ip' => $range, 
+        'type' => $type,
+        'source' => $source,
+        'netname' => $netName,
+        ))
       ->execute();
   }
   
@@ -35,6 +40,8 @@ class IpRanges{
       $bid = $record['bid'];
       $ranges[$bid]['type'] = $record['type'];
       $ranges[$bid]['ipRange'] = $record['ip'];
+      $ranges[$bid]['source'] = $record['source'];
+      $ranges[$bid]['netName'] = $record['netname'];
     } while (TRUE);   
     return $ranges;
   }

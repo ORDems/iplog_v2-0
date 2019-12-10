@@ -9,7 +9,7 @@ use Drupal\iplog\IpLog;
 
 function iplog_404_tracker() {
   $ipLogObj = new IpLog();
-  $ipLogObj->iplog();
+  $ipLogObj->ipLogError();
   $output = "Thanks for visiting our site.  Your IP has been logged.";
   return $output;
 }

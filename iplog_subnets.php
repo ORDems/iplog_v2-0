@@ -32,6 +32,7 @@ function iplog_subnets_form($form, &$form_state) {
         'refreshIP'=>'Refresh Known IP adddesses',
         'exportIP' => 'Export known IP addresses',
         'ipLog' => 'Display IP Log',
+        'iplogrefresh' => 'Remove unknown from log',
         'refreshBlockedIP' => 'Refresh blocked IP',
         'exportBlockedIP' => 'Export blocked IP',
       );
@@ -95,6 +96,7 @@ function iplog_subnets_form($form, &$form_state) {
         '#value' => t('Continue'),
         '#id' => 'Submit',
       );
+      
       $form_state['iplog']['page'] = 'function';
       break;
       
@@ -137,6 +139,7 @@ function iplog_subnets_form_submit($form, &$form_state) {
   $page = $form_state['iplog']['page'];
   switch ($page) {
     case 'function':
+      if(!isset($form_state['input']['function'])) {break;}
       $function = $form_state['input']['function'];
       switch ($function) {
         
@@ -157,6 +160,7 @@ function iplog_subnets_form_submit($form, &$form_state) {
             $cidrRecord = array();
             $cidrRecord[0] = $cidr;
             $cidrRecord[1] = $name;
+            $cidrRecord[2] = $name;
             fputcsv($fh, $cidrRecord);
           }
           fclose($fh);
@@ -166,6 +170,18 @@ function iplog_subnets_form_submit($form, &$form_state) {
           
         case 'ipLog':
           $form_state['iplog']['page'] = $function;
+          break;
+        
+        case 'iplogrefresh':
+          $ipLogObj = new IpLog();
+          $ipLog = $ipLogObj->getIpLog();
+          //iplog_debug_msg('iplog',$ipLog);
+          foreach ($ipLog as $ipKey => $ipRecord) {
+            if($ipRecord['orgId'] == 'unknown' OR $ipRecord['orgId'] == 'user') {
+              $ipLogObj->deleteIpLogEntry($ipKey);
+            }
+          }
+          $form_state['iplog']['page'] = 'function';
           break;
         
         case 'refreshBlockedIP':
@@ -188,6 +204,8 @@ function iplog_subnets_form_submit($form, &$form_state) {
             $blockedRecord[0] = $bid;
             $blockedRecord[1] = $blocked['type'];
             $blockedRecord[2] = $blocked['ipRange'];
+            $blockedRecord[3] = $blocked['source'];
+            $blockedRecord[4] = $blocked['netName'];
             fputcsv($fh, $blockedRecord);
           }
           fclose($fh);
@@ -210,6 +228,21 @@ function iplog_subnets_form_submit($form, &$form_state) {
         form_set_error('$knownIPFileTmp', 'Failed to open File.');
         return FALSE;
       }
+      
+      $ipLogObj = new IpLog();
+      
+      $ipRangesObj = new IpRanges();
+      $ipRanges = $ipRangesObj->getIpRanges();
+      $whitelistRecord = array();
+      foreach ($ipRanges as $bid => $record) {
+        if($record['type'] == 'whitelist') {
+          $range = $record['ipRange'];
+          $rangeValues = explode("-", $range);
+          $cidr = $ipLogObj->ip2cidr($rangeValues[0],$rangeValues[1]);
+          $whitelistRecord[$cidr] = $bid;
+        }
+      }
+      //iplog_debug_msg('whitelist',$whitelistRecord);
       $subnets = array();
       do {
         $cidrRecord = fgetcsv($fh);
@@ -217,12 +250,23 @@ function iplog_subnets_form_submit($form, &$form_state) {
         if(empty($cidrRecord)) {break;}
         $cidr = iplog_sanitize_string($cidrRecord[0]);
         $name = iplog_sanitize_string($cidrRecord[1]);
-        $subnets[$cidr] = $name;
+        $type = NULL;
+        if(isset($cidrRecord[2])) {
+          $type = iplog_sanitize_string($cidrRecord[2]);
+        }
+        $subnets[$cidr]['name'] = $name;
+        $subnets[$cidr]['type'] = $type;
       } while (TRUE);
       //iplog_debug_msg('subnets',$subnets);
       $ipLogObj->resetIpAddrs();
-      foreach ($subnets as $cidr => $name) {
-        $ipLogObj->setIpAddr($cidr,$name);
+      foreach ($subnets as $cidr => $record) {
+        $type = $record['type'];
+        $ipLogObj->setIpAddr($cidr,$record['name'],$type);
+        if($type == 'whitelist' AND !isset($whitelistRecord[$cidr])) {
+          $highLow = $ipLogObj->cidr_conv($cidr);
+          $range = $highLow[0].'-'.$highLow[1];
+          $ipRangesObj->setIpRange($range,$type,NULL,$record['name']);
+        }
       }
       $form_state['iplog']['page'] = 'function';
       break;
@@ -253,12 +297,21 @@ function iplog_subnets_form_submit($form, &$form_state) {
       }
       //iplog_debug_msg('blockedranges',$blockedRecord);
       $newBlocked = array();
+      $newIndex = 0;
       do {
         $rangeRecord = fgetcsv($fh);
         //iplog_debug_msg('rangerecord',$rangeRecord);
         if(empty($rangeRecord)) {break;}
         $type = iplog_sanitize_string($rangeRecord[1]);
         $ip= iplog_sanitize_string($rangeRecord[2]);
+        $source = NULL;
+        if(!empty($rangeRecord[3])) {
+          $source = iplog_sanitize_string($rangeRecord[3]);
+        }
+        $netName = NULL;
+        if(!empty($rangeRecord[4])) {
+          $netName = iplog_sanitize_string($rangeRecord[4]);
+        }
         if($type=='blacklist') {
           $range = explode('-',$ip);
           $cidrRange = explode('/',$ip);
@@ -282,12 +335,15 @@ function iplog_subnets_form_submit($form, &$form_state) {
           }
         }
         if(!$found) {
-          $newBlocked[] = $low.'-'.$high;
+          $newBlocked[$newIndex]['ip'] = $low.'-'.$high;
+          $newBlocked[$newIndex]['source'] = $source;
+          $newBlocked[$newIndex]['netname'] = $netName;
+          $newIndex++;
         }
       } while (TRUE);
       //iplog_debug_msg('newblocked',$newBlocked);
       foreach ($newBlocked as $range) {
-        $ipRangesObj->setIpRange($range,'blacklist');
+        $ipRangesObj->setIpRange($range['ip'],'blacklist',$range['source'],$range['netname']);
       }
       $form_state['iplog']['page'] = 'function';
       break;
