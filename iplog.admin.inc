@@ -10,12 +10,15 @@
  */
 function iplog_page() {
   $rows = array();
-  $header = array(t('banned IP addresses'), t('list type'), t('Operations'));
+  $header = array(t('banned IP addresses'), t('list type'), 
+     t('source'), t('net name'), t('Operations'));
   $ip_list = iplog_get_ip_list();
   foreach ($ip_list as $ip) {
     $rows[] = array(
       str_replace('-', ' - ',$ip->ip),
       $ip->type,
+      $ip->source,
+      $ip->netname,
       l(t('delete'), "admin/config/people/ip-ranges/delete/$ip->bid/$ip->ip"),
     );
   }
@@ -64,6 +67,22 @@ function iplog_form($form, $form_state) {
     '#required' => TRUE,
     '#description' => t('Choose list type.'),
   );
+  $form['source'] = array(
+    '#title' => t('The source of IP assignment.)'),
+    '#type' => 'textfield',
+    '#size' => 32,
+    '#required' => FALSE,
+    '#maxlength' => 32,
+    '#description' => t('One of the regional IP managers, eg RIPE (optional).'),
+  );
+  $form['netname'] = array(
+    '#title' => t('Name of the org using the IP (optional).'),
+    '#type' => 'textfield',
+    '#size' => 48,
+    '#required' => FALSE,
+    '#maxlength' => 128,
+    '#description' => t('Identifies the org being blocked.'),
+  );
   $form['actions'] = array('#type' => 'actions');
   $form['actions']['submit'] = array(
     '#type' => 'submit',
@@ -106,8 +125,15 @@ function iplog_form_submit($form, &$form_state) {
   }
 
   $type = $form_state['values']['type'];
-  db_insert('iplog')
-    ->fields(array('ip' => $ip, 'type' => $type))
+  $ip_source = $form_state['values']['source'];
+  $ip_netname = $form_state['values']['netname'];
+  db_insert('ip_ranges')
+    ->fields(array(
+      'ip' => $ip, 
+      'type' => $type,
+      'source' => $ip_source,
+      'netname' => $ip_netname,
+      ))
     ->execute();
 
   $list = ($type == 'blacklist') ? 'blacklisted' : 'whitelisted';

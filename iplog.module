@@ -2,6 +2,7 @@
 /**
  * Name:  iplog_module     V2.0  11/15/19
  */
+require_once "iplog_class_log.php";
 
 define('IPLOG_VARIABLE','iplog_subnets');
 
@@ -157,13 +158,15 @@ function iplog_check_range($ip, $current_ip) {
  * @param $bid
  *   (optional) id of the current ban, used when existing record is updated.
  */
-function iplog_write_record($ip, $type, $bid = NULL) {
+function iplog_write_record($ip, $type, $bid = NULL, $source=NULL, $netname=NULL) {
   db_merge('ip_ranges')
     ->key(array('bid' => $bid))
     ->fields(array(
       'bid' => $bid,
       'ip' => $ip,
       'type' => $type,
+      'source' => $source,
+      'netname' => $netname,
     ))
     ->execute();
 }
