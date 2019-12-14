@@ -46,4 +46,10 @@ class IpRanges{
     return $ranges;
   }
   
+  public function resetIpRanges($type) {
+    db_delete(self::IPRANGESTBL)
+      ->condition('type', $type)
+      ->execute();
+  }
+  
 }
