@@ -176,6 +176,7 @@ class IpLog{
   public function cidr_conv($cidr_address) {
     $first = substr($cidr_address, 0, strpos($cidr_address, "/"));
     $netmask = substr(strstr($cidr_address, "/"), 1);
+    if(empty($netmask)) {return array($first,NULL);}
     $first_bin = str_pad(decbin(ip2long($first)), 32, "0", STR_PAD_LEFT);
     $netmask_bin = str_pad(str_repeat("1", (integer)$netmask), 32, "0", STR_PAD_RIGHT);
     $last_bin = '';

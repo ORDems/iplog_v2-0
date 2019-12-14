@@ -159,8 +159,8 @@ function iplog_subnets_form_submit($form, &$form_state) {
           foreach ($subnets as $cidr => $name) {
             $cidrRecord = array();
             $cidrRecord[0] = $cidr;
-            $cidrRecord[1] = $name;
-            $cidrRecord[2] = $name;
+            $cidrRecord[1] = $name['orgId'];
+            $cidrRecord[2] = $name['type'];
             fputcsv($fh, $cidrRecord);
           }
           fclose($fh);
@@ -232,16 +232,7 @@ function iplog_subnets_form_submit($form, &$form_state) {
       $ipLogObj = new IpLog();
       
       $ipRangesObj = new IpRanges();
-      $ipRanges = $ipRangesObj->getIpRanges();
-      $whitelistRecord = array();
-      foreach ($ipRanges as $bid => $record) {
-        if($record['type'] == 'whitelist') {
-          $range = $record['ipRange'];
-          $rangeValues = explode("-", $range);
-          $cidr = $ipLogObj->ip2cidr($rangeValues[0],$rangeValues[1]);
-          $whitelistRecord[$cidr] = $bid;
-        }
-      }
+
       //iplog_debug_msg('whitelist',$whitelistRecord);
       $subnets = array();
       do {
@@ -259,10 +250,12 @@ function iplog_subnets_form_submit($form, &$form_state) {
       } while (TRUE);
       //iplog_debug_msg('subnets',$subnets);
       $ipLogObj->resetIpAddrs();
+      $ipRangesObj->resetIpRanges('whitelist');
+      
       foreach ($subnets as $cidr => $record) {
         $type = $record['type'];
         $ipLogObj->setIpAddr($cidr,$record['name'],$type);
-        if($type == 'whitelist' AND !isset($whitelistRecord[$cidr])) {
+        if($type == 'whitelist') {
           $highLow = $ipLogObj->cidr_conv($cidr);
           $range = $highLow[0].'-'.$highLow[1];
           $ipRangesObj->setIpRange($range,$type,NULL,$record['name']);
@@ -283,19 +276,13 @@ function iplog_subnets_form_submit($form, &$form_state) {
         form_set_error('$blockedIPFileTmp', 'Failed to open File.');
         return FALSE;
       }
+      
+      
       $ipRangesObj = new IpRanges();
-      $ipRanges = $ipRangesObj->getIpRanges();
-      $blockedRecord = array();
-      foreach ($ipRanges as $bid => $blocked) {
-        if($blocked['type'] == 'blacklist') {
-          $range = $blocked['ipRange'];
-          $rangeValues = explode("-", $range);
-          $blockedRecord[$bid] = array(
-            'high'=>$rangeValues[1],
-            'low'=>$rangeValues[0]);
-        }
-      }
-      //iplog_debug_msg('blockedranges',$blockedRecord);
+      $ipRangesObj->resetIpRanges('blacklist');
+      
+      
+      
       $newBlocked = array();
       $newIndex = 0;
       do {
@@ -326,24 +313,32 @@ function iplog_subnets_form_submit($form, &$form_state) {
         } else {
           continue;
         }
-        //iplog_debug_msg('high: '.$high.' low: '.$low.' ip: '.$ip,'');
-        $found = FALSE;
-        foreach ($blockedRecord as $bid => $blockedRange) {
-          if($high == $blockedRange['high'] AND $low == $blockedRange['low']) {
-            $found = TRUE;
-            break;
+        
+        // Check if we have a duplicate range in the input file.
+        $dup = FALSE;
+        foreach ($newBlocked as $ipDef) {
+          if($ipDef['low'] == $low AND $ipDef['high'] == $high) {
+            $dup = TRUE;
           }
         }
-        if(!$found) {
-          $newBlocked[$newIndex]['ip'] = $low.'-'.$high;
+        
+        If(!$dup) {
+          $newBlocked[$newIndex]['low'] = $low;
+          $newBlocked[$newIndex]['high'] = $high;
           $newBlocked[$newIndex]['source'] = $source;
           $newBlocked[$newIndex]['netname'] = $netName;
           $newIndex++;
         }
       } while (TRUE);
+      
+      
+      
+      
+      
       //iplog_debug_msg('newblocked',$newBlocked);
       foreach ($newBlocked as $range) {
-        $ipRangesObj->setIpRange($range['ip'],'blacklist',$range['source'],$range['netname']);
+        $ipRange = $range['low'].'-'.$range['high'];
+        $ipRangesObj->setIpRange($ipRange,'blacklist',$range['source'],$range['netname']);
       }
       $form_state['iplog']['page'] = 'function';
       break;
