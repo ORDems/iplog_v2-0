@@ -1,6 +1,6 @@
 <?php
 /*
- * Name: iplog_subnets.php   V2.0  11/15/19
+ * Name: iplog_subnets.php   V2.0  1/6/20
  */
 
 require_once "iplog_class_log.php";
@@ -177,7 +177,9 @@ function iplog_subnets_form_submit($form, &$form_state) {
           $ipLog = $ipLogObj->getIpLog();
           //iplog_debug_msg('iplog',$ipLog);
           foreach ($ipLog as $ipKey => $ipRecord) {
-            if($ipRecord['orgId'] == 'unknown' OR $ipRecord['orgId'] == 'user') {
+            if($ipRecord['orgId'] == 'unknown' OR $ipRecord['orgId'] == 'NL' 
+              OR $ipRecord['orgId'] == 'password guess' OR $ipRecord['orgId'] == 'unknown user' 
+               OR $ipRecord['orgId'] == 'user') {
               $ipLogObj->deleteIpLogEntry($ipKey);
             }
           }
@@ -239,7 +241,8 @@ function iplog_subnets_form_submit($form, &$form_state) {
         $cidrRecord = fgetcsv($fh);
         //iplog_debug_msg('cidrrecord',$cidrRecord);
         if(empty($cidrRecord)) {break;}
-        $cidr = iplog_sanitize_string($cidrRecord[0]);
+        $cidrEaw = iplog_sanitize_string($cidrRecord[0]);
+        $cidr = str_replace(' ', '', $cidrEaw);
         $name = iplog_sanitize_string($cidrRecord[1]);
         $type = NULL;
         if(isset($cidrRecord[2])) {
@@ -300,8 +303,9 @@ function iplog_subnets_form_submit($form, &$form_state) {
           $netName = iplog_sanitize_string($rangeRecord[4]);
         }
         if($type=='blacklist') {
-          $range = explode('-',$ip);
-          $cidrRange = explode('/',$ip);
+          $justIp = str_replace(' ', '', $ip);
+          $range = explode('-',$justIp);
+          $cidrRange = explode('/',$justIp);
           if(isset($cidrRange[1])) {
             list($low, $high) = $ipLogObj->cidr_conv($ip);
           } elseif (isset($range[1])) {
