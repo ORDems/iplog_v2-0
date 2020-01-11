@@ -80,8 +80,8 @@ class IpLog{
     $this->ipLog('unknown');
   }
   
-  public function ipLogUser() {
-    $this->ipLog('user');
+  public function ipLogUser($label) {
+    $this->ipLog($label);
   }
   
   
