@@ -14,6 +14,10 @@ class IpLog{
   const IPLOGTBL = "ip_log";
   const KNOWNIPTBL = "ip_known";
   const IPLOG_VARIABLE = 'iplog_subnets';
+  
+  public $removeables = array('unknown'=>'unknown','nl'=>'NL',
+    'passwordGuess'=>'password guess','unknownUser'=>'unknown user',
+    'user'=>'user');
  
   private $schema = 
     array(
