@@ -175,11 +175,14 @@ function iplog_subnets_form_submit($form, &$form_state) {
         case 'iplogrefresh':
           $ipLogObj = new IpLog();
           $ipLog = $ipLogObj->getIpLog();
+          //$removeables = array('unknown','NL','password guess','unknown user','user');
+          $removeables = $ipLogObj->removeables;
           //iplog_debug_msg('iplog',$ipLog);
           foreach ($ipLog as $ipKey => $ipRecord) {
-            if($ipRecord['orgId'] == 'unknown' OR $ipRecord['orgId'] == 'NL' 
-              OR $ipRecord['orgId'] == 'password guess' OR $ipRecord['orgId'] == 'unknown user' 
-               OR $ipRecord['orgId'] == 'user') {
+            if(in_array($ipRecord['orgId'], $removeables)) {
+            //if($ipRecord['orgId'] == 'unknown' OR $ipRecord['orgId'] == 'NL' 
+            //  OR $ipRecord['orgId'] == 'password guess' OR $ipRecord['orgId'] == 'unknown user' 
+            //   OR $ipRecord['orgId'] == 'user') {
               $ipLogObj->deleteIpLogEntry($ipKey);
             }
           }
