@@ -40,7 +40,7 @@ class IpLog{
     $ip = $user->hostname;
     $organization = $org;
     $ipSubNets = $this->getIpAddrs();
-    //nlp_debug_msg('subnets', $ipSubNets);
+    nlp_debug_msg('subnets', $ipSubNets);
     if(!empty($ipSubNets)) {
       foreach ($ipSubNets as $ipSubNet => $record) {
         $subNetBase = $this->cidr_match($ip, $ipSubNet);
