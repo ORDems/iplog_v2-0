@@ -84,8 +84,33 @@ function iplog_subnets_form($form, &$form_state) {
       $ipLog = $ipLogObj->getIpLog();
       //iplog_debug_msg('iplog',$ipLog);
       $output = '';
+      
+      $blacklist = iplog_get_ip_list('blacklist');
       foreach ($ipLog as $ipKey => $ipRecord) {
-        $output .= $ipKey.', '.$ipRecord['ipAddr'].', '.$ipRecord['hits'].', '.$ipRecord['orgId']."<br>";
+        $handler = '';
+        $banned = FALSE;
+        if($ipRecord['orgId']=='unknown user' OR $ipRecord['orgId']=='unknown') {
+          
+          
+          foreach ($blacklist as $ip) {
+            if (iplog_check_ip($ip->ip, $ipRecord['ipAddr'])) {
+              $banned = TRUE;
+              break;
+            }
+          }
+
+          if(!$banned AND module_exists('defense') ) {
+            $ipHandler = defense_lookup($ipRecord['ipAddr']);
+            //iplog_debug_msg('iphandler',$ipHandler);
+            $ip_start = $ipHandler['addresses'][0]['startAddress'];
+            $ip_end = $ipHandler['addresses'][0]['endAddress'];
+            $cidr = $ipLogObj->ip2cidr($ip_start, $ip_end);
+            $handler = ', '.$ipHandler['handler'].', '.$ip_start.'-'.$ip_end.', '.$cidr;
+          }
+        }
+        if(!$banned) {
+          $output .= $ipKey.', '.$ipRecord['ipAddr'].', '.$ipRecord['hits'].', '.$ipRecord['orgId'].$handler."<br>";
+        }
       }
       $form['iplog'] = array (
         '#type' => 'markup',
@@ -246,6 +271,8 @@ function iplog_subnets_form_submit($form, &$form_state) {
         if(empty($cidrRecord)) {break;}
         $cidrEaw = iplog_sanitize_string($cidrRecord[0]);
         $cidr = str_replace(' ', '', $cidrEaw);
+        $slashPos = strpos($cidr,'/');
+        if($slashPos === FALSE) {continue;} // reject non-cidr format.
         $name = iplog_sanitize_string($cidrRecord[1]);
         $type = NULL;
         if(isset($cidrRecord[2])) {
