@@ -71,9 +71,9 @@ function iplog_schema() {
           'description'=>'IP Address as integer.',
         ),
         'IPaddr' => array( 
-          'type'=>'char', 
-          'length'=>16,
-          'description'=>'Individual IP or CIDR address range for unknown.',
+          'type'=>'varchar', 
+          'length'=>32,
+          'description'=>'Individual IP or address range for unknown IP.',
         ),
         'Hits' => array( 
           'type' => 'int', 
@@ -94,12 +94,19 @@ function iplog_schema() {
     $schema['ip_known'] = array(
       'description' => 'IP Address ranges known and identified as safe.',
       'fields' => array(
-        'CIDR' => array( 
+        'bid' => array( 
+          'type'=>'int',
+          'unsigned'=>TRUE,
+          'size'=>'big',
+          'not null' => TRUE,
+          'description'=>'Base address as int.',
+        ),
+        'ip' => array( 
           'type'=>'varchar',
-          'length'=>16,
+          'length'=>32,
           'description'=>'Range of IP addresses assigned to a known organization.',
         ),
-        'Type' => array( 
+        'type' => array( 
           'type'=>'varchar', 
           'length'=>9,
           'description'=>'Identifying addresses to be whitelisted.',
@@ -110,7 +117,7 @@ function iplog_schema() {
           'description'=>'Identifying code for owner of range of IP addresses.',
         ),
       ),
-      'primary key' => array( 'CIDR', ),
+      'primary key' => array( 'bid', ),
     );
   }
 

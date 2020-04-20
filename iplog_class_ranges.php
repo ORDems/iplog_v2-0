@@ -52,4 +52,23 @@ class IpRanges{
       ->execute();
   }
   
+  public function firstDecIp($ipRange) {
+    $rangeParts = explode('-',$ipRange);
+    $subBlocks = explode('.',$rangeParts[0]);
+    $ip = 0;
+    foreach ($subBlocks as $subBlock) {
+      $ip = $ip*256+$subBlock;
+    }
+    return $ip;
+  }
+  
+  public function firstDecCidr($cidr) {
+    $rangeBase = explode('/',$cidr);
+    $subBlocks = explode('.',$rangeBase[0]);
+    $ip = 0;
+    foreach ($subBlocks as $subBlock) {
+      $ip = $ip*256+$subBlock;
+    }
+    return $ip;
+  }
 }

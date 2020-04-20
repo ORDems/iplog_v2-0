@@ -4,6 +4,8 @@
  */
 require_once "iplog_class_log.php";
 
+use Drupal\iplog\IpLog;
+
 define('IPLOG_VARIABLE','iplog_subnets');
 
 function iplog_menu() {
@@ -197,5 +199,15 @@ function iplog_whitelist_own_address(){
   iplog_write_record(ip_address(), 'whitelist');
   drupal_set_message('Your own IP-address ('.ip_address().') has been whitelisted.');
   drupal_goto('admin/config/people/ip-ranges');
+}
+
+function iplog_knownIps() {
+  $ipLogObj = new IpLog();
+  return $ipLogObj->getIpAddrs();
+}
+
+function iplog_knownIp($ip,$knownIps) {
+  $ipLogObj = new IpLog();
+  return $ipLogObj->knownIP($ip,$knownIps);
 }
 

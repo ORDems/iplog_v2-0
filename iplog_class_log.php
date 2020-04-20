@@ -4,7 +4,7 @@
  * Contains Drupal\iplog\IpLog.
  */
 /*
- * Name: iplog_class_log.php   V2.0 11/15/19
+ * Name: iplog_class_log.php   V2.0 3/14/19
  *
  */
 namespace Drupal\iplog;
@@ -25,13 +25,22 @@ class IpLog{
         'description' => 'record of IP addresses that attempt unauthorized access.',
         'fields' => array(
           'IPkey' => array( 'type'=>'int','unsigned'=>TRUE,'size'=>'big','not null' => TRUE,'description'=>'Field fieldname of tablename.',),
-          'IPaddr' => array( 'type'=>'char', 'length'=>16,),
+          'IPaddr' => array( 'type'=>'varchar', 'length'=>32,),
           'Hits' => array( 'type' => 'int', 'size'=>'normal',),
           'OrgID' => array( 'type'=>'varchar', 'length'=>16,),
         ),
         'primary key' => array( 'IPkey', ),
       )
   );
+  
+  private function checkRange($ipRange, $currentIp) {
+    $ipRangeParts = explode('-', $ipRange);
+    list($lower, $upper) = $ipRangeParts;
+    $lowerDec = (float) sprintf("%u", ip2long($lower));
+    $upperDec = (float) sprintf("%u", ip2long($upper));
+    $ipDec = (float) sprintf("%u", ip2long($currentIp));
+    return (($ipDec >= $lowerDec) && ($ipDec <= $upperDec));
+  }
   
   private function ipLog($org) {
     $user = $GLOBALS['user'];  
@@ -40,22 +49,25 @@ class IpLog{
     $ip = $user->hostname;
     $organization = $org;
     $ipSubNets = $this->getIpAddrs();
-    nlp_debug_msg('subnets', $ipSubNets);
+    //nlp_debug_msg('subnets', $ipSubNets);
+    $ipInt = NULL;
     if(!empty($ipSubNets)) {
-      foreach ($ipSubNets as $ipSubNet => $record) {
-        $subNetBase = $this->cidr_match($ip, $ipSubNet);
-        if(!empty($subNetBase)) {
-          $organization = $record['orgId'];
-          $cidr = $ipSubNet;
+      foreach ($ipSubNets as $bid => $ipSubNet) {
+        //$subNetBase = $this->cidr_match($ip, $ipSubNet);
+        if(!empty($this->checkRange($ipSubNet['ip'], $ip))) {
+          
+          $ipInt = $bid;
+          $organization = $ipSubNet['orgId'];
+          $ipRange = $ipSubNet['ip'];
           break;
         }
       }
     }
-    if(empty($subNetBase)) {
-      $subNetBase = $ip;
-      $cidr = $ip;
+    if(empty($ipInt)) {
+      $ipInt = ip2long($ip);
+      $ipRange = $ip;
     }
-    $ipInt = ip2long($subNetBase);
+    
     //db_set_active(NLP_DATABASE);
     try {
       db_merge(self::IPLOGTBL)
@@ -64,7 +76,7 @@ class IpLog{
           ))
         ->fields(array(
           //'IPkey' => $ipInt,
-          'IPaddr' => $cidr,
+          'IPaddr' => $ipRange,
           'Hits' => 1,
           'OrgID' => $organization,
         ))
@@ -113,6 +125,18 @@ class IpLog{
       ->execute();
   }
   
+  public function knownIP($ip,$knownIps) {
+    if(!empty($knownIps)) {
+      foreach ($knownIps as $record) {
+        $exists = $this->checkRange($record['ip'], $ip);
+        if($exists) {
+          return TRUE;
+        }
+      }
+    }
+    return FALSE;
+  }
+  
   public function getIpAddrs() {
     $query = db_select(self::KNOWNIPTBL, 'k')
       ->fields('k');
@@ -122,19 +146,21 @@ class IpLog{
       $record = $result->fetchAssoc();
       //iplog_debug_msg('record', $record);
       if(empty($record)) {break;}
-      $cidr = $record['CIDR'];
-      $knownIps[$cidr]['orgId'] = $record['OrgID'];
-      $knownIps[$cidr]['type'] = $record['Type'];
+      $bid = $record['bid'];
+      $knownIps[$bid]['orgId'] = $record['OrgID'];
+      $knownIps[$bid]['type'] = $record['type'];
+      $knownIps[$bid]['ip'] = $record['ip'];
     } while (TRUE);   
     return $knownIps;
   }
   
-  public function setIpAddr($range,$name,$type) {
+  public function setIpAddr($bid,$ipRange,$name,$type) {
     db_merge(self::KNOWNIPTBL)
-      ->key(array('CIDR'=> $range))
+      ->key(array('bid'=> $bid))
       ->fields(array(
-        'OrgID' => $name,
-        'Type' => $type,
+        'ip' => $ipRange,
+        'type' => $type,
+        'OrgId' => $name,
       ))
       ->execute();
   }
