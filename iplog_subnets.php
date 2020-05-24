@@ -183,6 +183,10 @@ function iplog_subnets_form_submit($form, &$form_state) {
           $fileObj->status = 0;
           file_save($fileObj);
           $fh = fopen($uri,"w");
+          
+          $hdr = array('BaseIP','IPRange','Owner','Type',);
+          fputcsv($fh, $hdr);
+          
           $knownIpRanges = $ipLogObj->getIpAddrs();
           $cidrRecords = array();
           foreach ($knownIpRanges as $bid => $ipRange) {
@@ -240,6 +244,10 @@ function iplog_subnets_form_submit($form, &$form_state) {
           $fileObj->status = 0;
           file_save($fileObj);
           $fh = fopen($uri,"w");
+          
+          $hdr = array('BaseIP','Type','IPRange','Source','Owner');
+          fputcsv($fh, $hdr);
+          
           $ipRanges = $ipRangesObj->getIpRanges();
           //iplog_debug_msg('subnets',$subnets);
           
@@ -281,6 +289,7 @@ function iplog_subnets_form_submit($form, &$form_state) {
         form_set_error('$knownIPFileTmp', 'Failed to open File.');
         return FALSE;
       }
+      $hdr = fgetcsv($fh);
       
       $ipLogObj = new IpLog();
       
@@ -331,7 +340,7 @@ function iplog_subnets_form_submit($form, &$form_state) {
         form_set_error('$blockedIPFileTmp', 'Failed to open File.');
         return FALSE;
       }
-      
+      $hdr = fgetcsv($fh);
       
       $ipRangesObj = new IpRanges();
       $ipRangesObj->resetIpRanges('blacklist');
